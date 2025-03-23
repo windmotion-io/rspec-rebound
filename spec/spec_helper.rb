@@ -2,10 +2,8 @@ require 'rspec'
 require 'rspec/core/sandbox'
 
 require 'rspec/rebound'
-if Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2')
-  require "pry-debugger"
-else
-  require "pry-byebug"
+if Gem::Version.new(RUBY_VERSION) > Gem::Version.new('3')
+  require 'debug'
 end
 
 RSpec.configure do |config|
