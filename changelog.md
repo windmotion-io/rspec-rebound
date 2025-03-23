@@ -91,3 +91,17 @@ rspec-retry now supports rspec 3.3. (thanks @eitoball, #32)
 ## dev changes
 include travis configuration for testing rspec 3.2.* and 3.3.*
 (thanks @eitoball, #31)
+
+# Changelog
+
+## 0.1.0 (YYYY-MM-DD)
+
+### Added
+- Initial release
+- [List major features]
+
+### Changed
+- [List changes]
+
+### Fixed
+- [List fixes]
