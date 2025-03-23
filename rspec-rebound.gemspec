@@ -19,4 +19,5 @@ Gem::Specification.new do |gem|
   gem.version       = RSpec::Rebound::VERSION
   gem.add_runtime_dependency "rspec-core", "~> 3.3"
   gem.add_development_dependency "rspec", "~> 3.3"
+  gem.add_development_dependency "debug", "~> 1.0"
 end
