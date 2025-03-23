@@ -41,14 +41,12 @@ class RSpec::Rebound::Formatter < RSpec::Core::Formatters::BaseTextFormatter
   private
 
   def increment_success(example)
-    # debugger
     previous = @tries[example]
     @tries[example] = {
       successes: previous[:successes] + 1, tries: previous[:tries] + 1 }
   end
 
   def increment_tries(example)
-    # debugger
     previous = @tries[example]
     @tries[example] = {
       successes: previous[:successes], tries: previous[:tries] + 1 }

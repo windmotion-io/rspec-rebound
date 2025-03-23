@@ -26,7 +26,7 @@ describe RSpec::Rebound do
   class OtherError < StandardError; end
   class SharedError < StandardError; end
   before(:all) do
-    ENV.delete('RSPEC_RETRY_RETRY_COUNT')
+    ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
   end
 
   context 'no retry option' do
@@ -81,14 +81,14 @@ describe RSpec::Rebound do
       end
     end
 
-    context 'with the environment variable RSPEC_RETRY_RETRY_COUNT' do
+    context 'with the environment variable RSPEC_REBOUND_RETRY_COUNT' do
       before(:all) do
         set_expectations([false, false, true])
-        ENV['RSPEC_RETRY_RETRY_COUNT'] = '3'
+        ENV['RSPEC_REBOUND_RETRY_COUNT'] = '3'
       end
 
       after(:all) do
-        ENV.delete('RSPEC_RETRY_RETRY_COUNT')
+        ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
       end
 
       it 'should override the retry count set in an example', :retry => 2 do
@@ -375,6 +375,85 @@ describe RSpec::Rebound do
         'without retry option' => [true, 1],
         'with retry option' => [false, 3]
       })
+    end
+  end
+
+  describe 'Flaky callback detection' do
+    let!(:example_group) do
+      RSpec.describe do
+        class ReboundResults
+          @@results = {}
+          @@flaky_test_callback_called = nil
+
+          def self.results
+            @@results
+          end
+
+          def self.flaky_test_callback_called
+            @@flaky_test_callback_called
+          end
+
+          def add(example)
+            @@results[example.description] = [example.exception.nil?, example.attempts]
+          end
+        end
+
+        def count
+          @count ||= 0
+          @count
+        end
+      
+        def count_up
+          @count ||= 0
+          @count += 1
+        end
+
+        def set_expectations(expectations)
+          @expectations = expectations
+        end
+      
+        def shift_expectation
+          @expectations.shift
+        end
+
+        before(:all) do
+          RSpec.configuration.flaky_test_callback = proc do |example|
+            ReboundResults.class_variable_set(:@@flaky_test_callback_called, example.description)
+          end
+        end
+    
+        after(:all) do
+          RSpec.configuration.flaky_test_callback = nil
+        end
+
+        around do |example|
+          example.run_with_retry
+          results = ReboundResults.results
+          results[example.description] = [example.exception.nil?, example.attempts]
+          ReboundResults.class_variable_set(:@@results, results)
+        end
+
+        before(:all) do
+          set_expectations([false, true])
+        end
+
+        specify 'without retry option', retry: 0 do
+          expect(2).to eq(count)
+        end
+
+        specify 'with retry option', retry: 1 do
+          expect(true).to be(shift_expectation)
+        end
+      end
+    end
+
+    it 'should be exposed' do
+      example_group.run
+      expect(ReboundResults.results).to eq({
+        'without retry option' => [false, 1],
+        'with retry option' => [true, 2]
+      })
+      expect(ReboundResults.flaky_test_callback_called).to eq("with retry option")
     end
   end
 
