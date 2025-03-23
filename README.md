@@ -8,6 +8,8 @@ specified number of times until the example succeeds.
 
 This gem is derived from the [rspec-retry](https://github.com/NoRedInk/rspec-retry) gem by NoRedInk. We would like to express our sincere gratitude to NoRedInk for their original work. RSpec::Rebound is an updated, upgraded, and maintained version of that gem.
 
+**Important migration note:** When moving from rspec-retry to rspec-rebound, you should subtract 1 from every `retry: X` value in your tests. In rspec-rebound, `retry: 2` means up to 2 retries (3 attempts total), whereas in rspec-retry it might have meant 2 attempts total. This change makes the retry count more intuitive.
+
 ### Compatibility
 
 | Rspec Version | Rspec-Rebound Version |
@@ -62,11 +64,11 @@ end
 ## Usage
 
 ```ruby
-it 'should randomly succeed', :retry => 3 do
+it 'should randomly succeed', :retry => 2 do
   expect(rand(2)).to eq(1)
 end
 
-it 'should succeed after a while', :retry => 3, :retry_wait => 10 do
+it 'should succeed after a while', :retry => 2, :retry_wait => 10 do
   expect(command('service myservice status')).to eq('started')
 end
 # run spec (following log is shown if verbose_retry options is true)
