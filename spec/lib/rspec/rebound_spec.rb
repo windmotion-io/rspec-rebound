@@ -363,7 +363,7 @@ describe RSpec::Rebound do
           expect(true).to be(true)
         end
 
-        specify 'with retry option', retry: 3 do
+        specify 'with retry option', retry: 2 do
           expect(true).to be(false)
         end
       end
@@ -383,7 +383,7 @@ describe RSpec::Rebound do
     line_1 = __LINE__ + 8
     line_2 = __LINE__ + 11
     let(:group) do
-      RSpec.describe 'ExampleGroup', retry: 2 do
+      RSpec.describe 'ExampleGroup', retry: 1 do
         after do
           fail 'broken after hook'
         end

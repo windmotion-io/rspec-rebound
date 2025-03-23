@@ -4,23 +4,17 @@ RSpec::Rebound adds a ``:retry`` option for intermittently failing rspec example
 If an example has the ``:retry`` option, rspec will retry the example the
 specified number of times until the example succeeds.
 
+## Acknowledgments
+
+This gem is derived from the [rspec-retry](https://github.com/NoRedInk/rspec-retry) gem by NoRedInk. We would like to express our sincere gratitude to NoRedInk for their original work. RSpec::Rebound is an updated, upgraded, and maintained version of that gem.
+
 ### Compatibility
 
 | Rspec Version | Rspec-Rebound Version |
 |---------------|------------------------|
-| > 3.8         | 0.1.0                  |
-| > 3.3, <= 3.8 | 0.1.0                  |
-| 3.2           | 0.4.6               |
-| 2.14.8        | 0.4.4               |
+| > 3.3         | 0.1.0                  |
+| < 3.3         | Use [rspec-retry](https://github.com/NoRedInk/rspec-retry) instead |
 
-### Maintenance Expectations
-
-NoRedInk used to be a Ruby shop, and we open-sourced this in the hope that it will help other people.
-However, we've been moving away from Ruby for some time now, and only plan to do maintenance on this repo when we have an internal need for it.
-We don't plan to add any new functionality, and expect that it will fall behind the latest versions of Ruby and Rspec.
-
-That said, if you're reading this and you need this gem to do something new, feel free to fork it and publish your own gem!
-If you open an issue here to let us know about your fork, we can add a link to it from this repo to help folks find something that's more actively maintained.
 
 ## Installation
 
@@ -88,7 +82,7 @@ You can call `ex.run_with_retry(opts)` on an individual example.
 
 - __:verbose_retry__(default: *false*) Print retry status
 - __:display_try_failure_messages__ (default: *false*) If verbose retry is enabled, print what reason forced the retry
-- __:default_retry_count__(default: *1*) If retry count is not set in an example, this value is used by default. Note that currently this is a 'try' count. If increased from the default of 1, all examples will be retried.
+- __:default_retry_count__(default: *0*) If retry count is not set in an example, this value is used by default. This is a 'retry' count. If increased from the default of 0 to 1, if they fail all examples will be retried once (and 2 attempts in total).
 - __:default_sleep_interval__(default: *0*) Seconds to wait between retries
 - __:clear_lets_on_failure__(default: *true*) Clear memoized values for ``let``s before retrying
 - __:exceptions_to_hard_fail__(default: *[]*) List of exceptions that will trigger an immediate test failure without retry. Takes precedence over __:exceptions_to_retry__

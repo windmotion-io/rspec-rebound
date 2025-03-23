@@ -59,7 +59,7 @@ module RSpec
               RSpec.configuration.retry_count_condition.call(ex) ||
               RSpec.configuration.default_retry_count
           ).to_i,
-          1
+          0
       ].max
     end
 
@@ -128,7 +128,7 @@ module RSpec
 
         example.metadata[:retry_exceptions] << example.exception
 
-        break if attempts >= retry_count
+        break if attempts >= retry_count + 1
 
         if exceptions_to_hard_fail.any?
           break if exception_exists_in?(exceptions_to_hard_fail, example.exception)
@@ -139,7 +139,7 @@ module RSpec
         end
 
         if verbose_retry? && display_try_failure_messages?
-          if attempts != retry_count
+          if attempts != retry_count + 1
             exception_strings =
               if ::RSpec::Core::MultipleExceptionError::InterfaceTag === example.exception
                 example.exception.all_exceptions.map(&:to_s)
