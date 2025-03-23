@@ -251,15 +251,6 @@ describe RSpec::Rebound do
         end
       end
     end
-
-    describe 'flaky spec detection' do
-      before(:all) { set_expectations([false, true]) }
-
-      it 'should detect flaky specs', flaky_spec_detection: true, retry: 0 do
-        expect(true).to be(shift_expectation)
-        expect(count).to eq(2)
-      end
-    end
   end
 
   describe 'clearing lets' do
@@ -387,9 +378,82 @@ describe RSpec::Rebound do
     end
   end
 
-  describe 'flaky spec detection' do
-    it 'should detect flaky specs', flaky_spec_detection: true do
-      expect(true).to be(true)
+  describe 'Flaky callback detection' do
+    let!(:example_group) do
+      RSpec.describe do
+        class ReboundResults
+          @@results = {}
+          @@flaky_test_callback_called = nil
+
+          def self.results
+            @@results
+          end
+
+          def self.flaky_test_callback_called
+            @@flaky_test_callback_called
+          end
+
+          def add(example)
+            @@results[example.description] = [example.exception.nil?, example.attempts]
+          end
+        end
+
+        def count
+          @count ||= 0
+          @count
+        end
+      
+        def count_up
+          @count ||= 0
+          @count += 1
+        end
+
+        def set_expectations(expectations)
+          @expectations = expectations
+        end
+      
+        def shift_expectation
+          @expectations.shift
+        end
+
+        before(:all) do
+          RSpec.configuration.flaky_test_callback = proc do |example|
+            ReboundResults.class_variable_set(:@@flaky_test_callback_called, example.description)
+          end
+        end
+    
+        after(:all) do
+          RSpec.configuration.flaky_test_callback = nil
+        end
+
+        around do |example|
+          example.run_with_retry
+          results = ReboundResults.results
+          results[example.description] = [example.exception.nil?, example.attempts]
+          ReboundResults.class_variable_set(:@@results, results)
+        end
+
+        before(:all) do
+          set_expectations([false, true])
+        end
+
+        specify 'without retry option', retry: 0 do
+          expect(2).to eq(count)
+        end
+
+        specify 'with retry option', retry: 1 do
+          expect(true).to be(shift_expectation)
+        end
+      end
+    end
+
+    it 'should be exposed' do
+      example_group.run
+      expect(ReboundResults.results).to eq({
+        'without retry option' => [false, 1],
+        'with retry option' => [true, 2]
+      })
+      expect(ReboundResults.flaky_test_callback_called).to eq("with retry option")
     end
   end
 
