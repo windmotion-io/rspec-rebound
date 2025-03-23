@@ -1,0 +1,53 @@
+name: Test Rspec Rebound
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        gemfile: [rspec_3.3.gemfile, rspec_3.4.gemfile, rspec_3.5.gemfile, rspec_3.7.gemfile, rspec_3.9.gemfile, rspec_3.10.gemfile, rspec_3.11.gemfile, rspec_3.12.gemfile, rspec_3.13.gemfile]
+        ruby-version: [ '2.7', '3.0', '3.1', '3.3']
+        exclude:
+          - ruby-version: '2.7'
+            gemfile: 'rspec_3.13.gemfile'
+          - ruby-version: '2.7'
+            gemfile: 'rspec_3.12.gemfile'
+          - ruby-version: '2.7'
+            gemfile: 'rspec_3.11.gemfile'
+          - ruby-version: '2.7'
+            gemfile: 'rspec_3.10.gemfile'
+          - ruby-version: '2.7'
+            gemfile: 'rspec_3.9.gemfile'
+          - ruby-version: '2.7'
+            gemfile: 'rspec_3.8.gemfile'
+          - ruby-version: '3.3'
+            gemfile: 'rspec_3.3.gemfile'
+          - ruby-version: '3.3'
+            gemfile: 'rspec_3.4.gemfile'
+          - ruby-version: '3.3'
+            gemfile: 'rspec_3.5.gemfile'
+
+    env:
+      BUNDLE_GEMFILE: spec/gemfiles/${{ matrix.gemfile }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Ruby ${{ matrix.ruby-version }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+          bundler-cache: true
+
+      - name: Run tests
+        run: |
+          bundle exec rspec
