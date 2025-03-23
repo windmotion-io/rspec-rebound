@@ -95,11 +95,11 @@ You can call `ex.run_with_retry(opts)` on an individual example.
 - __:exceptions_to_hard_fail__(default: *[]*) List of exceptions that will trigger an immediate test failure without retry. Takes precedence over __:exceptions_to_retry__
 - __:exceptions_to_retry__(default: *[]*) List of exceptions that will trigger a retry (when empty, all exceptions will)
 - __:retry_callback__(default: *nil*) Callback function to be called between retries
-- __:flaky_test_callback__(default: *nil*) Callback function to be called when a flaky test is detected (when a test fails but then passes on a subsequent attempt)p
-
+- __:flaky_test_callback__(default: *nil*) Callback function to be called when a flaky test is detected (when a test fails but then passes on a subsequent attempt)
+- __:flaky_spec_detection__(default: *true*) If true, flaky tests will be detected and reported, even if the retry count is set to 0. This is useful for detecting flaky tests that are not being retried.
 
 ## Environment Variables
-- __RSPEC_RETRY_RETRY_COUNT__ can override the retry counts even if a retry count is set in an example or default_retry_count is set in a configuration.
+- __RSPEC_REBOUND_RETRY_COUNT__ can override the retry counts even if a retry count is set in an example or default_retry_count is set in a configuration.
 
 ## Contributing
 

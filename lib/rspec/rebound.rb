@@ -36,6 +36,9 @@ module RSpec
         # Callback for flaky tests
         config.add_setting :flaky_test_callback, :default => nil
 
+        # If true, flaky tests will be detected and reported, even if the retry count is set to 0. This is useful for detecting flaky tests that are not being retried.
+        config.add_setting :flaky_spec_detection, :default => true
+
         config.around(:each) do |ex|
           ex.run_with_retry
         end
@@ -57,7 +60,7 @@ module RSpec
     def retry_count
       [
           (
-          ENV['RSPEC_RETRY_RETRY_COUNT'] ||
+          ENV['RSPEC_REBOUND_RETRY_COUNT'] ||
               ex.metadata[:retry] ||
               RSpec.configuration.retry_count_condition.call(ex) ||
               RSpec.configuration.default_retry_count
@@ -122,7 +125,7 @@ module RSpec
         example.metadata[:retry_attempts] = self.attempts
         example.metadata[:retry_exceptions] ||= []
 
-        example.clear_exception
+        example.clear_exception unless RSpec.configuration.flaky_spec_detection && retry_count == 0
         ex.run
 
         if example.exception.nil?
@@ -168,6 +171,12 @@ module RSpec
         # If the callback is defined, let's call it
         if RSpec.configuration.retry_callback
           example.example_group_instance.instance_exec(example, &RSpec.configuration.retry_callback)
+        end
+
+        if RSpec.configuration.flaky_spec_detection
+          if attempts > 0 && example.exception.nil?
+            example.example_group_instance.instance_exec(example, &RSpec.configuration.flaky_spec_detection)
+          end
         end
 
         sleep sleep_interval if sleep_interval.to_f > 0

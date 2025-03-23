@@ -26,7 +26,7 @@ describe RSpec::Rebound do
   class OtherError < StandardError; end
   class SharedError < StandardError; end
   before(:all) do
-    ENV.delete('RSPEC_RETRY_RETRY_COUNT')
+    ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
   end
 
   context 'no retry option' do
@@ -81,14 +81,14 @@ describe RSpec::Rebound do
       end
     end
 
-    context 'with the environment variable RSPEC_RETRY_RETRY_COUNT' do
+    context 'with the environment variable RSPEC_REBOUND_RETRY_COUNT' do
       before(:all) do
         set_expectations([false, false, true])
-        ENV['RSPEC_RETRY_RETRY_COUNT'] = '3'
+        ENV['RSPEC_REBOUND_RETRY_COUNT'] = '3'
       end
 
       after(:all) do
-        ENV.delete('RSPEC_RETRY_RETRY_COUNT')
+        ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
       end
 
       it 'should override the retry count set in an example', :retry => 2 do
@@ -251,6 +251,15 @@ describe RSpec::Rebound do
         end
       end
     end
+
+    describe 'flaky spec detection' do
+      before(:all) { set_expectations([false, true]) }
+
+      it 'should detect flaky specs', flaky_spec_detection: true, retry: 0 do
+        expect(true).to be(shift_expectation)
+        expect(count).to eq(2)
+      end
+    end
   end
 
   describe 'clearing lets' do
@@ -375,6 +384,12 @@ describe RSpec::Rebound do
         'without retry option' => [true, 1],
         'with retry option' => [false, 3]
       })
+    end
+  end
+
+  describe 'flaky spec detection' do
+    it 'should detect flaky specs', flaky_spec_detection: true do
+      expect(true).to be(true)
     end
   end
 
