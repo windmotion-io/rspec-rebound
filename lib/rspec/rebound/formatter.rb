@@ -1,6 +1,6 @@
 require 'rspec/core/formatters/base_text_formatter'
 
-class RSpec::Retry::Formatter < RSpec::Core::Formatters::BaseTextFormatter
+class RSpec::Rebound::Formatter < RSpec::Core::Formatters::BaseTextFormatter
   RSpec::Core::Formatters.register self, :example_passed
 
   def initialize(output)
@@ -19,7 +19,7 @@ class RSpec::Retry::Formatter < RSpec::Core::Formatters::BaseTextFormatter
   def dump_pending(_); end
 
   def dump_summary(notification)
-    summary = "\nRSpec Retry Summary:\n"
+    summary = "\nRSpec Rebound Summary:\n"
     @tries.each do |key, retry_data|
       next if retry_data[:successes] < 1 || retry_data[:tries] <= 1
       summary += "\t#{key.location}: #{key.full_description}: passed at attempt #{retry_data[:tries]}\n"

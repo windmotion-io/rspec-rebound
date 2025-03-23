@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe RSpec::Retry do
+describe RSpec::Rebound do
   def count
     @count ||= 0
     @count
@@ -66,13 +66,18 @@ describe RSpec::Retry do
     end
 
     context 'with :retry => 0' do
-      after(:all) { @@this_ran_once = nil }
+      class Fred
+        @@attempt_count = 0
+        def attempt_count
+          @@attempt_count
+        end
+      end
       it 'should still run once', retry: 0 do
-        @@this_ran_once = true
+        Fred.class_variable_set(:@@attempt_count, 1)
       end
 
-      it 'should run have run once' do
-        expect(@@this_ran_once).to be true
+      it 'should have run exactly once' do
+        expect(Fred.class_variable_get(:@@attempt_count)).to eq(1)
       end
     end
 
@@ -335,13 +340,23 @@ describe RSpec::Retry do
   describe 'Example::Procsy#attempts' do
     let!(:example_group) do
       RSpec.describe do
-        before :all do
+        class ReboundResults
           @@results = {}
+
+          def self.results
+            @@results
+          end
+
+          def add(example)
+            @@results[example.description] = [example.exception.nil?, example.attempts]
+          end
         end
 
         around do |example|
           example.run_with_retry
-          @@results[example.description] = [example.exception.nil?, example.attempts]
+          results = ReboundResults.results
+          results[example.description] = [example.exception.nil?, example.attempts]
+          ReboundResults.class_variable_set(:@@results, results)
         end
 
         specify 'without retry option' do
@@ -356,7 +371,7 @@ describe RSpec::Retry do
 
     it 'should be exposed' do
       example_group.run
-      expect(example_group.class_variable_get(:@@results)).to eq({
+      expect(ReboundResults.results).to eq({
         'without retry option' => [true, 1],
         'with retry option' => [false, 3]
       })
@@ -390,16 +405,16 @@ describe RSpec::Retry do
       expect {
         group.run RSpec.configuration.reporter
       }.to change { output.string }.to a_string_including <<-STRING.gsub(/^\s+\| ?/, '')
-        | 1st Try error in ./spec/lib/rspec/retry_spec.rb:#{line_1}:
+        | 1st Try error in ./spec/lib/rspec/rebound_spec.rb:#{line_1}:
         | broken after hook
         |
-        | RSpec::Retry: 2nd try ./spec/lib/rspec/retry_spec.rb:#{line_1}
+        | RSpec::Rebound: 2nd try ./spec/lib/rspec/rebound_spec.rb:#{line_1}
         | F
-        | 1st Try error in ./spec/lib/rspec/retry_spec.rb:#{line_2}:
+        | 1st Try error in ./spec/lib/rspec/rebound_spec.rb:#{line_2}:
         | broken spec
         | broken after hook
         |
-        | RSpec::Retry: 2nd try ./spec/lib/rspec/retry_spec.rb:#{line_2}
+        | RSpec::Rebound: 2nd try ./spec/lib/rspec/rebound_spec.rb:#{line_2}
       STRING
     end
   end

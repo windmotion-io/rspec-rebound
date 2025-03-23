@@ -9,7 +9,7 @@ module RSpec
 
       class Procsy
         def run_with_retry(opts = {})
-          RSpec::Retry.new(self, opts).run
+          RSpec::Rebound.new(self, opts).run
         end
 
         def attempts

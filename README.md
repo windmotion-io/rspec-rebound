@@ -1,15 +1,15 @@
-# RSpec::Retry ![Build Status](https://secure.travis-ci.org/NoRedInk/rspec-retry.svg?branch=master)
+# RSpec::Rebound
 
-RSpec::Retry adds a ``:retry`` option for intermittently failing rspec examples.
+RSpec::Rebound adds a ``:retry`` option for intermittently failing rspec examples.
 If an example has the ``:retry`` option, rspec will retry the example the
 specified number of times until the example succeeds.
 
 ### Compatibility
 
-| Rspec Version | Rspec-Retry Version |
-|---------------|---------------------|
-| > 3.8         | 0.6.2 but untested  |
-| > 3.3, <= 3.8 | 0.6.2               |
+| Rspec Version | Rspec-Rebound Version |
+|---------------|------------------------|
+| > 3.8         | 0.1.0                  |
+| > 3.3, <= 3.8 | 0.1.0                  |
 | 3.2           | 0.4.6               |
 | 2.14.8        | 0.4.4               |
 
@@ -27,7 +27,7 @@ If you open an issue here to let us know about your fork, we can add a link to i
 Add this line to your application's Gemfile:
 
 ```ruby
-gem 'rspec-retry', group: :test # Unlike rspec, this doesn't need to be included in development group
+gem 'rspec-rebound', group: :test # Unlike rspec, this doesn't need to be included in development group
 ```
 
 And then execute:
@@ -36,13 +36,13 @@ And then execute:
 
 Or install it yourself as:
 
-    $ gem install rspec-retry
+    $ gem install rspec-rebound
 
 require in ``spec_helper.rb``
 
 ```ruby
 # spec/spec_helper.rb
-require 'rspec/retry'
+require 'rspec/rebound'
 
 RSpec.configure do |config|
   # show retry status in spec process
@@ -76,8 +76,8 @@ it 'should succeed after a while', :retry => 3, :retry_wait => 10 do
   expect(command('service myservice status')).to eq('started')
 end
 # run spec (following log is shown if verbose_retry options is true)
-# RSpec::Retry: 2nd try ./spec/lib/random_spec.rb:49
-# RSpec::Retry: 3rd try ./spec/lib/random_spec.rb:49
+# RSpec::Rebound: 2nd try ./spec/lib/random_spec.rb:49
+# RSpec::Rebound: 3rd try ./spec/lib/random_spec.rb:49
 ```
 
 ### Calling `run_with_retry` programmatically
@@ -88,7 +88,7 @@ You can call `ex.run_with_retry(opts)` on an individual example.
 
 - __:verbose_retry__(default: *false*) Print retry status
 - __:display_try_failure_messages__ (default: *false*) If verbose retry is enabled, print what reason forced the retry
-- __:default_retry_count__(default: *1*) If retry count is not set in an example, this value is used by default. Note that currently this is a 'try' count. If increased from the default of 1, all examples will be retried. We plan to fix this as a breaking change in version 1.0.
+- __:default_retry_count__(default: *1*) If retry count is not set in an example, this value is used by default. Note that currently this is a 'try' count. If increased from the default of 1, all examples will be retried.
 - __:default_sleep_interval__(default: *0*) Seconds to wait between retries
 - __:clear_lets_on_failure__(default: *true*) Clear memoized values for ``let``s before retrying
 - __:exceptions_to_hard_fail__(default: *[]*) List of exceptions that will trigger an immediate test failure without retry. Takes precedence over __:exceptions_to_retry__

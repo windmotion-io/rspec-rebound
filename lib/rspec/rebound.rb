@@ -1,9 +1,9 @@
 require 'rspec/core'
-require 'rspec/retry/version'
+require 'rspec/rebound/version'
 require 'rspec_ext/rspec_ext'
 
 module RSpec
-  class Retry
+  class Rebound
     def self.setup
       RSpec.configure do |config|
         config.add_setting :verbose_retry, :default => false
@@ -106,12 +106,11 @@ module RSpec
 
     def run
       example = current_example
-
       loop do
         if attempts > 0
           RSpec.configuration.formatters.each { |f| f.retry(example) if f.respond_to? :retry }
           if verbose_retry?
-            message = "RSpec::Retry: #{ordinalize(attempts + 1)} try #{example.location}"
+            message = "RSpec::Rebound: #{ordinalize(attempts + 1)} try #{example.location}"
             message = "\n" + message if attempts == 1
             RSpec.configuration.reporter.message(message)
           end
@@ -188,4 +187,4 @@ module RSpec
   end
 end
 
-RSpec::Retry.setup
+RSpec::Rebound.setup
