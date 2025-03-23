@@ -97,6 +97,7 @@ You can call `ex.run_with_retry(opts)` on an individual example.
 - __:retry_callback__(default: *nil*) Callback function to be called between retries
 - __:flaky_test_callback__(default: *nil*) Callback function to be called when a flaky test is detected (when a test fails but then passes on a subsequent attempt)p
 
+
 ## Environment Variables
 - __RSPEC_RETRY_RETRY_COUNT__ can override the retry counts even if a retry count is set in an example or default_retry_count is set in a configuration.
 
