@@ -92,16 +92,17 @@ rspec-retry now supports rspec 3.3. (thanks @eitoball, #32)
 include travis configuration for testing rspec 3.2.* and 3.3.*
 (thanks @eitoball, #31)
 
-# Changelog
-
-## 0.1.0 (YYYY-MM-DD)
+## 0.1.0 (2025-03-22)
 
 ### Added
 - Initial release
-- [List major features]
+- All respec-retry features
 
-### Changed
-- [List changes]
+## 0.2.0 (2025-03-29)
 
-### Fixed
-- [List fixes]
+### Added
+- Added support for RSpec 3.10
+- Added support for Ruby 3.1
+- Added support for Ruby 3.2
+- Added flaky_test_callback
+- Added flaky_spec_detection
