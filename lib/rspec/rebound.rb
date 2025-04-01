@@ -7,7 +7,7 @@ module RSpec
     def self.setup
       RSpec.configure do |config|
         config.add_setting :verbose_retry, :default => false
-        config.add_setting :default_retry_count, :default => 1
+        config.add_setting :default_retry_count, :default => 0
         config.add_setting :default_sleep_interval, :default => 0
         config.add_setting :exponential_backoff, :default => false
         config.add_setting :clear_lets_on_failure, :default => true
