@@ -106,3 +106,6 @@ include travis configuration for testing rspec 3.2.* and 3.3.*
 - Added support for Ruby 3.2
 - Added flaky_test_callback
 - Added flaky_spec_detection
+
+## 0.2.1 (2025-04-01)
+- Fixed a bug where the default retry count was 1 instead of 0
