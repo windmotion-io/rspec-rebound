@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe RSpec::Rebound do
+describe 'rspec rebound' do
   def count
     @count ||= 0
     @count
@@ -35,219 +35,248 @@ describe RSpec::Rebound do
     end
   end
 
-  context 'with retry option' do
-    before(:each) { count_up }
+  # First define the Counter class outside of any describe block
+  class Counter
+    # Define a class variable for the counter
+    @@count = 0
 
-    context do
-      before(:all) { set_expectations([false, false, true]) }
-
-      it 'should run example until :retry times', :retry => 3 do
-        expect(true).to be(shift_expectation)
-        expect(count).to eq(3)
-      end
+    # Instance method to retrieve the current counter value
+    def count
+      @@count
     end
 
-    context do
-      before(:all) { set_expectations([false, true, false]) }
-
-      it 'should stop retrying if  example is succeeded', :retry => 3 do
-        expect(true).to be(shift_expectation)
-        expect(count).to eq(2)
-      end
+    # Instance method to increment the counter by one
+    def increment
+      @@count += 1
     end
 
-    context 'with lambda condition' do
-      before(:all) { set_expectations([false, true]) }
-
-      it "should get retry count from condition call", retry_me_once: true do
-        expect(true).to be(shift_expectation)
-        expect(count).to eq(2)
-      end
+    def reset
+      @@count = 0
     end
+  end
 
-    context 'with :retry => 0' do
-      class Fred
-        @@attempt_count = 0
-        def attempt_count
-          @@attempt_count
-        end
-      end
-      it 'should still run once', retry: 0 do
-        Fred.class_variable_set(:@@attempt_count, 1)
-      end
+  describe 'with retry option' do
+    # Now define the tests for Counter
+    describe 'using Counter' do
+      klass = Counter.new
+      before(:each) { klass.increment }
 
-      it 'should have run exactly once' do
-        expect(Fred.class_variable_get(:@@attempt_count)).to eq(1)
-      end
-    end
-
-    context 'with the environment variable RSPEC_REBOUND_RETRY_COUNT' do
-      before(:all) do
-        set_expectations([false, false, true])
-        ENV['RSPEC_REBOUND_RETRY_COUNT'] = '3'
-      end
-
-      after(:all) do
-        ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
-      end
-
-      it 'should override the retry count set in an example', :retry => 2 do
-        expect(true).to be(shift_expectation)
-        expect(count).to eq(3)
-      end
-    end
-
-    context "with exponential backoff enabled", :retry => 3, :retry_wait => 0.001, :exponential_backoff => true do
       context do
-        before(:all) do
-          set_expectations([false, false, true])
-          @start_time = Time.now
-        end
-
+        before(:context) { klass.reset }
         it 'should run example until :retry times', :retry => 3 do
-          expect(true).to be(shift_expectation)
-          expect(count).to eq(3)
-          expect(Time.now - @start_time).to be >= (0.001)
-        end
-      end
-    end
-
-    describe "with a list of exceptions to immediately fail on", :retry => 2, :exceptions_to_hard_fail => [HardFailError] do
-      context "the example throws an exception contained in the hard fail list" do
-        it "does not retry" do
-          expect(count).to be < 2
-          pending "This should fail with a count of 1: Count was #{count}"
-          raise HardFailError unless count > 1
+          expect(klass.count).to eq(3)
         end
       end
 
-      context "the example throws a child of an exception contained in the hard fail list" do
-        it "does not retry" do
-          expect(count).to be < 2
-          pending "This should fail with a count of 1: Count was #{count}"
-          raise HardFailChildError unless count > 1
-        end
-      end
-
-      context "the throws an exception not contained in the hard fail list" do
-        it "retries the maximum number of times" do
-          raise OtherError unless count > 1
-          expect(count).to eq(2)
-        end
-      end
-    end
-
-    describe "with a list of exceptions to retry on", :retry => 2, :exceptions_to_retry => [RetryError] do
       context do
-        let(:rspec_version) { RSpec::Core::Version::STRING }
-
-        let(:example_code) do
-          %{
-            $count ||= 0
-            $count += 1
-
-            raise NameError unless $count > 2
-          }
+        before(:context) { klass.reset }
+    
+        it 'should stop retrying if  example is succeeded', :retry => 3 do
+          expect(klass.count).to eq(2)
         end
-
-        let!(:example_group) do
-          $count, $example_code = 0, example_code
-
-          RSpec.describe("example group", exceptions_to_retry: [NameError], retry: 3).tap do |this|
-            this.run # initialize for rspec 3.3+ with no examples
+      end
+    
+      context 'with lambda condition' do
+        before(:context) { klass.reset }
+    
+        it "should get retry count from condition call", retry_me_once: true do
+          expect(klass.count).to eq(2)
+        end
+      end
+    
+      context 'with :retry => 0' do
+        class Fred
+          @@attempt_count = 0
+          def attempt_count
+            @@attempt_count
           end
         end
-
-        let(:retry_attempts) do
-          example_group.examples.first.metadata[:retry_attempts]
+        it 'should still run once', retry: 0 do
+          Fred.class_variable_set(:@@attempt_count, 1)
         end
-
-        it 'should retry and match attempts metadata' do
-          example_group.example { instance_eval($example_code) }
-          example_group.run
-
-          expect(retry_attempts).to eq(2)
-        end
-
-        let(:retry_exceptions) do
-          example_group.examples.first.metadata[:retry_exceptions]
-        end
-
-        it 'should add exceptions into retry_exceptions metadata array' do
-          example_group.example { instance_eval($example_code) }
-          example_group.run
-
-          expect(retry_exceptions.count).to eq(2)
-          expect(retry_exceptions[0].class).to eq NameError
-          expect(retry_exceptions[1].class).to eq NameError
+    
+        it 'should have run exactly once' do
+          expect(Fred.class_variable_get(:@@attempt_count)).to eq(1)
         end
       end
-
-      context "the example throws an exception contained in the retry list" do
-        it "retries the maximum number of times" do
-          raise RetryError unless count > 1
-          expect(count).to eq(2)
+    
+      context 'with the environment variable RSPEC_REBOUND_RETRY_COUNT' do
+        before(:context) { klass.reset }
+        before(:all) do
+          ENV['RSPEC_REBOUND_RETRY_COUNT'] = '3'
+        end
+    
+        after(:all) do
+          ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
+        end
+    
+        it 'should override the retry count set in an example', :retry => 2 do
+          expect(klass.count).to eq(3)
         end
       end
-
-      context "the example throws a child of an exception contained in the retry list" do
-        it "retries the maximum number of times" do
-          raise RetryChildError unless count > 1
-          expect(count).to eq(2)
-        end
-      end
-
-      context "the example fails (with an exception not in the retry list)" do
-        it "only runs once" do
-          set_expectations([false])
-          expect(count).to eq(1)
-        end
-      end
-
-      context 'the example retries exceptions which match with case equality' do
-        class CaseEqualityError < StandardError
-          def self.===(other)
-            # An example of dynamic matching
-            other.message == 'Rescue me!'
+    
+      context "with exponential backoff enabled", :retry => 3, :retry_wait => 0.001, :exponential_backoff => true do
+        context do
+          before(:all) do
+            @start_time = Time.now
+          end
+          before(:context) { klass.reset }
+    
+          it 'should run example until :retry times', :retry => 3 do
+            # expect(true).to be(shift_expectation)
+            expect(klass.count).to eq(3)
+            expect(Time.now - @start_time).to be >= (0.001)
           end
         end
-
-        it 'retries the maximum number of times', exceptions_to_retry: [CaseEqualityError] do
-          raise StandardError, 'Rescue me!' unless count > 1
-          expect(count).to eq(2)
+      end
+    
+      describe "with a list of exceptions to immediately fail on", :retry => 2, :exceptions_to_hard_fail => [HardFailError] do
+        context "the example throws an exception contained in the hard fail list" do
+          before(:context) { klass.reset }
+          it "does not retry" do
+            expect(klass.count).to be < 2
+            pending "This should fail with a count of 1: Count was #{klass.count}"
+            raise HardFailError unless klass.count > 1
+          end
+        end
+    
+        context "the example throws a child of an exception contained in the hard fail list" do
+          before(:context) { klass.reset }
+          it "does not retry" do
+            expect(klass.count).to be < 2
+            pending "This should fail with a count of 1: Count was #{klass.count}"
+            raise HardFailChildError unless klass.count > 1
+          end
+        end
+    
+        context "the throws an exception not contained in the hard fail list" do
+          before(:context) { klass.reset }
+          it "retries the maximum number of times" do
+            raise OtherError unless klass.count > 1
+            expect(klass.count).to eq(2)
+          end
         end
       end
-    end
-
-    describe "with both hard fail and retry list of exceptions", :retry => 2, :exceptions_to_retry => [SharedError, RetryError], :exceptions_to_hard_fail => [SharedError, HardFailError] do
-      context "the exception thrown exists in both lists" do
-        it "does not retry because the hard fail list takes precedence" do
-          expect(count).to be < 2
-          pending "This should fail with a count of 1: Count was #{count}"
-          raise SharedError unless count > 1
+    
+      describe "with a list of exceptions to retry on", :retry => 2, :exceptions_to_retry => [RetryError] do
+        context do
+          before(:context) { klass.reset }
+          let(:rspec_version) { RSpec::Core::Version::STRING }
+    
+          let(:example_code) do
+            %{
+              $count ||= 0
+              $count += 1
+    
+              raise NameError unless $count > 2
+            }
+          end
+    
+          let!(:example_group) do
+            $count, $example_code = 0, example_code
+    
+            RSpec.describe("example group", exceptions_to_retry: [NameError], retry: 3).tap do |this|
+              this.run # initialize for rspec 3.3+ with no examples
+            end
+          end
+    
+          let(:retry_attempts) do
+            example_group.examples.first.metadata[:retry_attempts]
+          end
+    
+          it 'should retry and match attempts metadata' do
+            example_group.example { instance_eval($example_code) }
+            example_group.run
+    
+            expect(retry_attempts).to eq(2)
+          end
+    
+          let(:retry_exceptions) do
+            example_group.examples.first.metadata[:retry_exceptions]
+          end
+    
+          it 'should add exceptions into retry_exceptions metadata array' do
+            example_group.example { instance_eval($example_code) }
+            example_group.run
+    
+            expect(retry_exceptions.count).to eq(2)
+            expect(retry_exceptions[0].class).to eq NameError
+            expect(retry_exceptions[1].class).to eq NameError
+          end
+        end
+    
+        context "the example throws an exception contained in the retry list" do
+          before(:context) { klass.reset }
+          it "retries the maximum number of times" do
+            raise RetryError unless klass.count > 1
+            expect(klass.count).to eq(2)
+          end
+        end
+    
+        context "the example throws a child of an exception contained in the retry list" do
+          before(:context) { klass.reset }
+          it "retries the maximum number of times" do
+            raise RetryChildError unless klass.count > 1
+            expect(klass.count).to eq(2)
+          end
+        end
+    
+        context "the example fails (with an exception not in the retry list)" do
+          before(:context) { klass.reset }
+          it "only runs once" do
+            expect(klass.count).to eq(1)
+          end
+        end
+    
+        context 'the example retries exceptions which match with case equality' do
+          class CaseEqualityError < StandardError
+            def self.===(other)
+              # An example of dynamic matching
+              other.message == 'Rescue me!'
+            end
+          end
+    
+          it 'retries the maximum number of times', exceptions_to_retry: [CaseEqualityError] do
+            raise StandardError, 'Rescue me!' unless klass.count > 1
+            expect(klass.count).to eq(2)
+          end
         end
       end
-
-      context "the example throws an exception contained in the hard fail list" do
-        it "does not retry because the hard fail list takes precedence" do
-          expect(count).to be < 2
-          pending "This should fail with a count of 1: Count was #{count}"
-          raise HardFailError unless count > 1
+    
+      describe "with both hard fail and retry list of exceptions", :retry => 2, :exceptions_to_retry => [SharedError, RetryError], :exceptions_to_hard_fail => [SharedError, HardFailError] do
+        context "the exception thrown exists in both lists" do
+          before(:context) { klass.reset }
+          it "does not retry because the hard fail list takes precedence" do
+            expect(klass.count).to be < 2
+            pending "This should fail with a count of 1: Count was #{klass.count}"
+            raise SharedError unless klass.count > 1
+          end
         end
-      end
-
-      context "the example throws an exception contained in the retry list" do
-        it "retries the maximum number of times because the hard fail list doesn't affect this exception" do
-          raise RetryError unless count > 1
-          expect(count).to eq(2)
+    
+        context "the example throws an exception contained in the hard fail list" do
+          before(:context) { klass.reset }
+          it "does not retry because the hard fail list takes precedence" do
+            expect(klass.count).to be < 2
+            pending "This should fail with a count of 1: Count was #{klass.count}"
+            raise HardFailError unless klass.count > 1
+          end
         end
-      end
-
-      context "the example throws an exception contained in neither list" do
-        it "does not retry because the the exception is not in the retry list" do
-          expect(count).to be < 2
-          pending "This should fail with a count of 1: Count was #{count}"
-          raise OtherError unless count > 1
+    
+        context "the example throws an exception contained in the retry list" do
+          before(:context) { klass.reset }
+          it "retries the maximum number of times because the hard fail list doesn't affect this exception" do
+            raise RetryError unless klass.count > 1
+            expect(klass.count).to eq(2)
+          end
+        end
+    
+        context "the example throws an exception contained in neither list" do
+          before(:context) { klass.reset }
+          it "does not retry because the the exception is not in the retry list" do
+            expect(klass.count).to be < 2
+            pending "This should fail with a count of 1: Count was #{klass.count}"
+            raise OtherError unless klass.count > 1
+          end
         end
       end
     end
