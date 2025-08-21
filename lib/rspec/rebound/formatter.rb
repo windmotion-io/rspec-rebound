@@ -24,7 +24,7 @@ class RSpec::Rebound::Formatter < RSpec::Core::Formatters::BaseTextFormatter
       next if retry_data[:successes] < 1 || retry_data[:tries] <= 1
       summary += "\t#{key.location}: #{key.full_description}: passed at attempt #{retry_data[:tries]}\n"
     end
-    retried = @tries.count { |_, v| v[:tries] > 1  && v[:successes] > 0 }
+    retried = @tries.count { |_, v| v[:tries] > 1 && v[:successes] > 0 }
     summary += "\n\t#{retried} of #{notification.example_count} tests passed with retries.\n"
     summary += "\t#{notification.failure_count} tests failed all retries.\n"
     output.puts summary

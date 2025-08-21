@@ -402,7 +402,7 @@ describe RSpec::Rebound do
           @count ||= 0
           @count
         end
-      
+
         def count_up
           @count ||= 0
           @count += 1
@@ -411,7 +411,7 @@ describe RSpec::Rebound do
         def set_expectations(expectations)
           @expectations = expectations
         end
-      
+
         def shift_expectation
           @expectations.shift
         end
@@ -421,7 +421,7 @@ describe RSpec::Rebound do
             ReboundResults.class_variable_set(:@@flaky_test_callback_called, example.description)
           end
         end
-    
+
         after(:all) do
           RSpec.configuration.flaky_test_callback = nil
         end
