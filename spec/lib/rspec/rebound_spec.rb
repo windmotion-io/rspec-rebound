@@ -1,14 +1,19 @@
 require 'spec_helper'
 
 describe RSpec::Rebound do
+  class RetryError < StandardError; end
+  class RetryChildError < RetryError; end
+  class HardFailError < StandardError; end
+  class HardFailChildError < HardFailError; end
+  class OtherError < StandardError; end
+  class SharedError < StandardError; end
+
   def count
     @count ||= 0
-    @count
   end
 
   def count_up
-    @count ||= 0
-    @count += 1
+    @count = count + 1
   end
 
   def set_expectations(expectations)
@@ -19,133 +24,120 @@ describe RSpec::Rebound do
     @expectations.shift
   end
 
-  class RetryError < StandardError; end
-  class RetryChildError < RetryError; end
-  class HardFailError < StandardError; end
-  class HardFailChildError < HardFailError; end
-  class OtherError < StandardError; end
-  class SharedError < StandardError; end
-  before(:all) do
+  before(:context) do
     ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
   end
 
-  context 'no retry option' do
-    it 'should work' do
-      expect(true).to be(true)
+  context 'with no retry option' do
+    it 'works correctly' do
+      expect(true).to be true
     end
   end
 
   context 'with retry option' do
-    before(:each) { count_up }
+    before { count_up }
 
-    context do
-      before(:all) { set_expectations([false, false, true]) }
+    context 'when the test fails until the last attempt' do
+      before(:context) { set_expectations([false, false, true]) }
 
-      it 'should run example until :retry times', :retry => 3 do
-        expect(true).to be(shift_expectation)
+      it 'runs the example until :retry times', retry: 3 do
+        expect(shift_expectation).to be true
         expect(count).to eq(3)
       end
     end
 
-    context do
-      before(:all) { set_expectations([false, true, false]) }
+    context 'when the test succeeds before the last attempt' do
+      before(:context) { set_expectations([false, true, false]) }
 
-      it 'should stop retrying if  example is succeeded', :retry => 3 do
-        expect(true).to be(shift_expectation)
+      it 'stops retrying if the example succeeds', retry: 3 do
+        expect(shift_expectation).to be true
         expect(count).to eq(2)
       end
     end
 
-    context 'with lambda condition' do
-      before(:all) { set_expectations([false, true]) }
+    context 'with a lambda condition for retry count' do
+      before(:context) { set_expectations([false, true]) }
 
-      it "should get retry count from condition call", retry_me_once: true do
-        expect(true).to be(shift_expectation)
+      it "gets the retry count from the condition's call", :retry_me_once do
+        expect(shift_expectation).to be true
         expect(count).to eq(2)
       end
     end
 
-    context 'with :retry => 0' do
-      class Fred
-        @@attempt_count = 0
-        def attempt_count
-          @@attempt_count
-        end
-      end
-      it 'should still run once', retry: 0 do
-        Fred.class_variable_set(:@@attempt_count, 1)
+    context 'with retry: 0' do
+      around do |example|
+        count_before_run = count
+        example.run
+        expect(count).to eq(count_before_run + 1)
       end
 
-      it 'should have run exactly once' do
-        expect(Fred.class_variable_get(:@@attempt_count)).to eq(1)
+      it 'runs only once', retry: 0 do
+        # Test logic is in the around hook to correctly capture state
+        # before and after the parent's before hook runs.
       end
     end
 
-    context 'with the environment variable RSPEC_REBOUND_RETRY_COUNT' do
-      before(:all) do
-        set_expectations([false, false, true])
+    context 'with the RSPEC_REBOUND_RETRY_COUNT environment variable' do
+      before(:context) do
+        @original_env = ENV['RSPEC_REBOUND_RETRY_COUNT']
         ENV['RSPEC_REBOUND_RETRY_COUNT'] = '3'
+        set_expectations([false, false, true])
       end
 
-      after(:all) do
-        ENV.delete('RSPEC_REBOUND_RETRY_COUNT')
+      after(:context) do
+        ENV['RSPEC_REBOUND_RETRY_COUNT'] = @original_env
       end
 
-      it 'should override the retry count set in an example', :retry => 2 do
-        expect(true).to be(shift_expectation)
+      it 'overrides the retry count set in an example', retry: 2 do
+        expect(shift_expectation).to be true
         expect(count).to eq(3)
       end
     end
 
-    context "with exponential backoff enabled", :retry => 3, :retry_wait => 0.001, :exponential_backoff => true do
-      context do
-        before(:all) do
-          set_expectations([false, false, true])
-          @start_time = Time.now
-        end
+    context 'with exponential backoff enabled' do
+      before(:context) do
+        set_expectations([false, false, true])
+        @start_time = Time.now
+      end
 
-        it 'should run example until :retry times', :retry => 3 do
-          expect(true).to be(shift_expectation)
-          expect(count).to eq(3)
-          expect(Time.now - @start_time).to be >= (0.001)
-        end
+      it 'waits between retries', :exponential_backoff, retry: 3, retry_wait: 0.001 do
+        expect(shift_expectation).to be true
+        expect(count).to eq(3)
+        expect(Time.now - @start_time).to be >= 0.001
       end
     end
 
-    describe "with a list of exceptions to immediately fail on", :retry => 2, :exceptions_to_hard_fail => [HardFailError] do
-      context "the example throws an exception contained in the hard fail list" do
-        it "does not retry" do
+    describe 'with a list of exceptions to immediately fail on', exceptions_to_hard_fail: [HardFailError], retry: 2 do
+      context 'when the example throws an exception in the hard fail list' do
+        it 'does not retry' do
           expect(count).to be < 2
           pending "This should fail with a count of 1: Count was #{count}"
           raise HardFailError unless count > 1
         end
       end
 
-      context "the example throws a child of an exception contained in the hard fail list" do
-        it "does not retry" do
+      context 'when the example throws a child of an exception in the hard fail list' do
+        it 'does not retry' do
           expect(count).to be < 2
           pending "This should fail with a count of 1: Count was #{count}"
           raise HardFailChildError unless count > 1
         end
       end
 
-      context "the throws an exception not contained in the hard fail list" do
-        it "retries the maximum number of times" do
+      context 'when the example throws an exception not in the hard fail list' do
+        it 'retries the maximum number of times' do
           raise OtherError unless count > 1
           expect(count).to eq(2)
         end
       end
     end
 
-    describe "with a list of exceptions to retry on", :retry => 2, :exceptions_to_retry => [RetryError] do
-      context do
-        let(:rspec_version) { RSpec::Core::Version::STRING }
-
+    describe 'with a list of exceptions to retry on', exceptions_to_retry: [RetryError], retry: 2 do
+      context 'tracking retry metadata' do
         let(:example_code) do
           %{
             $count ||= 0
             $count += 1
-
             raise NameError unless $count > 2
           }
         end
@@ -153,62 +145,50 @@ describe RSpec::Rebound do
         let!(:example_group) do
           $count, $example_code = 0, example_code
 
-          RSpec.describe("example group", exceptions_to_retry: [NameError], retry: 3).tap do |this|
-            this.run # initialize for rspec 3.3+ with no examples
+          RSpec.describe('example group', exceptions_to_retry: [NameError], retry: 3).tap do |group|
+            group.example('tracks attempts') { instance_eval($example_code) }
+            group.run
           end
         end
 
-        let(:retry_attempts) do
-          example_group.examples.first.metadata[:retry_attempts]
+        it 'matches attempts metadata after retries' do
+          example = example_group.examples.first
+          expect(example.metadata[:retry_attempts]).to eq(2)
         end
 
-        it 'should retry and match attempts metadata' do
-          example_group.example { instance_eval($example_code) }
-          example_group.run
-
-          expect(retry_attempts).to eq(2)
-        end
-
-        let(:retry_exceptions) do
-          example_group.examples.first.metadata[:retry_exceptions]
-        end
-
-        it 'should add exceptions into retry_exceptions metadata array' do
-          example_group.example { instance_eval($example_code) }
-          example_group.run
-
-          expect(retry_exceptions.count).to eq(2)
-          expect(retry_exceptions[0].class).to eq NameError
-          expect(retry_exceptions[1].class).to eq NameError
+        it 'adds exceptions into retry_exceptions metadata array' do
+          example = example_group.examples.first
+          exceptions = example.metadata[:retry_exceptions]
+          expect(exceptions.count).to eq(2)
+          expect(exceptions).to all(be_an_instance_of(NameError))
         end
       end
 
-      context "the example throws an exception contained in the retry list" do
-        it "retries the maximum number of times" do
+      context 'when the example throws an exception in the retry list' do
+        it 'retries the maximum number of times' do
           raise RetryError unless count > 1
           expect(count).to eq(2)
         end
       end
 
-      context "the example throws a child of an exception contained in the retry list" do
-        it "retries the maximum number of times" do
+      context 'when the example throws a child of an exception in the retry list' do
+        it 'retries the maximum number of times' do
           raise RetryChildError unless count > 1
           expect(count).to eq(2)
         end
       end
 
-      context "the example fails (with an exception not in the retry list)" do
-        it "only runs once" do
+      context 'when the example fails with an exception not in the retry list' do
+        it 'runs only once' do
           set_expectations([false])
           expect(count).to eq(1)
         end
       end
 
-      context 'the example retries exceptions which match with case equality' do
+      context 'when exceptions are matched with case equality (===)' do
         class CaseEqualityError < StandardError
           def self.===(other)
-            # An example of dynamic matching
-            other.message == 'Rescue me!'
+            other.is_a?(StandardError) && other.message == 'Rescue me!'
           end
         end
 
@@ -219,32 +199,32 @@ describe RSpec::Rebound do
       end
     end
 
-    describe "with both hard fail and retry list of exceptions", :retry => 2, :exceptions_to_retry => [SharedError, RetryError], :exceptions_to_hard_fail => [SharedError, HardFailError] do
-      context "the exception thrown exists in both lists" do
-        it "does not retry because the hard fail list takes precedence" do
+    describe 'with both hard fail and retry lists', exceptions_to_hard_fail: [SharedError, HardFailError], exceptions_to_retry: [SharedError, RetryError], retry: 2 do
+      context 'when the exception exists in both lists' do
+        it 'does not retry because the hard fail list takes precedence' do
           expect(count).to be < 2
           pending "This should fail with a count of 1: Count was #{count}"
           raise SharedError unless count > 1
         end
       end
 
-      context "the example throws an exception contained in the hard fail list" do
-        it "does not retry because the hard fail list takes precedence" do
+      context 'when the exception is only in the hard fail list' do
+        it 'does not retry' do
           expect(count).to be < 2
           pending "This should fail with a count of 1: Count was #{count}"
           raise HardFailError unless count > 1
         end
       end
 
-      context "the example throws an exception contained in the retry list" do
-        it "retries the maximum number of times because the hard fail list doesn't affect this exception" do
+      context 'when the exception is only in the retry list' do
+        it 'retries the maximum number of times' do
           raise RetryError unless count > 1
           expect(count).to eq(2)
         end
       end
 
-      context "the example throws an exception contained in neither list" do
-        it "does not retry because the the exception is not in the retry list" do
+      context 'when the exception is in neither list' do
+        it 'does not retry' do
           expect(count).to be < 2
           pending "This should fail with a count of 1: Count was #{count}"
           raise OtherError unless count > 1
@@ -254,7 +234,7 @@ describe RSpec::Rebound do
   end
 
   describe 'clearing lets' do
-    before(:all) do
+    before(:context) do
       @control = true
     end
 
@@ -264,76 +244,75 @@ describe RSpec::Rebound do
       @control = false
     end
 
-    it 'should clear the let when the test fails so it can be reset', :retry => 2 do
-      expect(let_based_on_control).to be(false)
+    it 'clears the let variable when the test fails so it can be reset', retry: 2 do
+      expect(let_based_on_control).to be false
     end
 
-    it 'should not clear the let when the test fails', :retry => 2, :clear_lets_on_failure => false do
-      expect(let_based_on_control).to be(!@control)
+    it 'does not clear the let variable when disabled', clear_lets_on_failure: false, retry: 2 do
+      expect(let_based_on_control).to be !@control
     end
   end
 
   describe 'running example.run_with_retry in an around filter', retry: 2 do
-    before(:each) { count_up }
-    before(:all) do
-      set_expectations([false, false, true])
-    end
+    before { count_up }
+    before(:context) { set_expectations([false, false, true]) }
 
     it 'allows retry options to be overridden', :overridden do
       expect(RSpec.current_example.metadata[:retry]).to eq(3)
     end
 
-    it 'uses the overridden options', :overridden do
-      expect(true).to be(shift_expectation)
+    it 'uses the overridden options to retry', :overridden do
+      expect(shift_expectation).to be true
       expect(count).to eq(3)
     end
   end
 
   describe 'calling retry_callback between retries', retry: 2 do
-    before(:all) do
+    before(:context) do
       RSpec.configuration.retry_callback = proc do |example|
         @retry_callback_called = true
-        @example = example
+        @example_from_callback = example
       end
     end
 
-    after(:all) do
+    after(:context) do
       RSpec.configuration.retry_callback = nil
     end
 
-    context 'if failure' do
-      before(:all) do
+    context 'on failure' do
+      before(:context) do
         @retry_callback_called = false
-        @example = nil
+        @example_from_callback = nil
         @retry_attempts = 0
       end
 
-      it 'should call retry callback', with_some: 'metadata' do |example|
+      it 'calls the configured retry callback with example metadata', with_some: 'metadata' do |example|
         if @retry_attempts == 0
           @retry_attempts += 1
-          expect(@retry_callback_called).to be(false)
-          expect(@example).to eq(nil)
+          expect(@retry_callback_called).to be false
+          expect(@example_from_callback).to be_nil
           raise "let's retry once!"
-        elsif @retry_attempts > 0
-          expect(@retry_callback_called).to be(true)
-          expect(@example).to eq(example)
-          expect(@example.metadata[:with_some]).to eq('metadata')
+        else
+          expect(@retry_callback_called).to be true
+          expect(@example_from_callback).to eq(example)
+          expect(@example_from_callback.metadata[:with_some]).to eq('metadata')
         end
       end
     end
 
-    context 'does not call retry_callback if no errors' do
-      before(:all) do
+    context 'on success' do
+      before(:context) do
         @retry_callback_called = false
-        @example = nil
+        @example_from_callback = nil
       end
 
       after do
-        expect(@retry_callback_called).to be(false)
-        expect(@example).to be_nil
+        expect(@retry_callback_called).to be false
+        expect(@example_from_callback).to be_nil
       end
 
-      it { true }
+      it 'does not call the retry_callback' do
+      end
     end
   end
 
@@ -341,35 +320,28 @@ describe RSpec::Rebound do
     let!(:example_group) do
       RSpec.describe do
         class ReboundResults
-          @@results = {}
-
-          def self.results
-            @@results
+          class << self
+            attr_accessor :results
           end
-
-          def add(example)
-            @@results[example.description] = [example.exception.nil?, example.attempts]
-          end
+          self.results = {}
         end
 
         around do |example|
           example.run_with_retry
-          results = ReboundResults.results
-          results[example.description] = [example.exception.nil?, example.attempts]
-          ReboundResults.class_variable_set(:@@results, results)
+          ReboundResults.results[example.description] = [example.exception.nil?, example.attempts]
         end
 
-        specify 'without retry option' do
-          expect(true).to be(true)
+        it 'without retry option' do
+          expect(true).to be true
         end
 
-        specify 'with retry option', retry: 2 do
-          expect(true).to be(false)
+        it 'with retry option', retry: 2 do
+          expect(true).to be false
         end
       end
     end
 
-    it 'should be exposed' do
+    it 'is exposed' do
       example_group.run
       expect(ReboundResults.results).to eq({
         'without retry option' => [true, 1],
@@ -381,84 +353,54 @@ describe RSpec::Rebound do
   describe 'Flaky callback detection' do
     let!(:example_group) do
       RSpec.describe do
-        class ReboundResults
-          @@results = {}
-          @@flaky_test_callback_called = nil
-
-          def self.results
-            @@results
+        class FlakyTestResults
+          class << self
+            attr_accessor :results, :flaky_test_callback_called
           end
-
-          def self.flaky_test_callback_called
-            @@flaky_test_callback_called
-          end
-
-          def add(example)
-            @@results[example.description] = [example.exception.nil?, example.attempts]
-          end
+          self.results = {}
+          self.flaky_test_callback_called = nil
         end
 
-        def count
-          @count ||= 0
-          @count
-        end
-      
-        def count_up
-          @count ||= 0
-          @count += 1
+        def expectations
+          @expectations ||= [false, true]
         end
 
-        def set_expectations(expectations)
-          @expectations = expectations
-        end
-      
-        def shift_expectation
-          @expectations.shift
-        end
-
-        before(:all) do
+        before(:context) do
           RSpec.configuration.flaky_test_callback = proc do |example|
-            ReboundResults.class_variable_set(:@@flaky_test_callback_called, example.description)
+            FlakyTestResults.flaky_test_callback_called = example.description
           end
         end
-    
-        after(:all) do
+
+        after(:context) do
           RSpec.configuration.flaky_test_callback = nil
         end
 
         around do |example|
           example.run_with_retry
-          results = ReboundResults.results
-          results[example.description] = [example.exception.nil?, example.attempts]
-          ReboundResults.class_variable_set(:@@results, results)
+          FlakyTestResults.results[example.description] = [example.exception.nil?, example.attempts]
         end
 
-        before(:all) do
-          set_expectations([false, true])
+        it 'without retry option', retry: 0 do
+          expect(true).to be false
         end
 
-        specify 'without retry option', retry: 0 do
-          expect(2).to eq(count)
-        end
-
-        specify 'with retry option', retry: 1 do
-          expect(true).to be(shift_expectation)
+        it 'with retry option', retry: 1 do
+          expect(expectations.shift).to be true
         end
       end
     end
 
-    it 'should be exposed' do
+    it 'calls the flaky test callback on success after a retry' do
       example_group.run
-      expect(ReboundResults.results).to eq({
+      expect(FlakyTestResults.results).to eq({
         'without retry option' => [false, 1],
         'with retry option' => [true, 2]
       })
-      expect(ReboundResults.flaky_test_callback_called).to eq("with retry option")
+      expect(FlakyTestResults.flaky_test_callback_called).to eq("with retry option")
     end
   end
 
   describe 'output in verbose mode' do
-
     line_1 = __LINE__ + 8
     line_2 = __LINE__ + 11
     let(:group) do
@@ -478,12 +420,14 @@ describe RSpec::Rebound do
     end
 
     it 'outputs failures correctly' do
-      RSpec.configuration.output_stream = output = StringIO.new
+      output_stream = StringIO.new
+      RSpec.configuration.output_stream = output_stream
       RSpec.configuration.verbose_retry = true
       RSpec.configuration.display_try_failure_messages = true
-      expect {
-        group.run RSpec.configuration.reporter
-      }.to change { output.string }.to a_string_including <<-STRING.gsub(/^\s+\| ?/, '')
+
+      group.run RSpec.configuration.reporter
+
+      expected_output = <<-STRING.gsub(/^\s+\| ?/, '')
         | 1st Try error in ./spec/lib/rspec/rebound_spec.rb:#{line_1}:
         | broken after hook
         |
@@ -495,6 +439,7 @@ describe RSpec::Rebound do
         |
         | RSpec::Rebound: 2nd try ./spec/lib/rspec/rebound_spec.rb:#{line_2}
       STRING
+      expect(output_stream.string).to include(expected_output)
     end
   end
 end
