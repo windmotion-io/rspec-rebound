@@ -13,7 +13,6 @@ Gem::Specification.new do |gem|
   
   gem.files         = `git ls-files`.split($\)
   gem.executables   = []
-  gem.test_files    = gem.files.grep(%r{^(test|spec|features)/})
   gem.name          = "rspec-rebound"
   gem.require_paths = ["lib"]
   gem.version       = RSpec::Rebound::VERSION
