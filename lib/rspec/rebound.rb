@@ -85,10 +85,10 @@ module RSpec
 
     def sleep_interval
       if ex.metadata[:exponential_backoff]
-          2**(current_example.attempts-1) * ex.metadata[:retry_wait]
+        2**(current_example.attempts-1) * ex.metadata[:retry_wait]
       else
-          ex.metadata[:retry_wait] ||
-              RSpec.configuration.default_sleep_interval
+        ex.metadata[:retry_wait] ||
+            RSpec.configuration.default_sleep_interval
       end
     end
 
@@ -209,7 +209,7 @@ module RSpec
 
     def display_try_failure_message(example, attempts, retry_count)
       return if attempts == retry_count + 1
-      
+
       exception_strings =
         if ::RSpec::Core::MultipleExceptionError::InterfaceTag === example.exception
           example.exception.all_exceptions.map(&:to_s)
