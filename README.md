@@ -1,5 +1,7 @@
 # RSpec::Rebound
 
+[![Gem Version](https://badge.fury.io/rb/rspec-rebound.svg)](https://badge.fury.io/rb/rspec-rebound) [![Test Rspec Rebound](https://github.com/windmotion-io/rspec-rebound/actions/workflows/ci.yml/badge.svg)](https://github.com/windmotion-io/rspec-rebound/actions/workflows/ci.yml)
+
 RSpec::Rebound adds a ``:retry`` option for intermittently failing rspec examples.
 If an example has the ``:retry`` option, rspec will retry the example the
 specified number of times until the example succeeds.
