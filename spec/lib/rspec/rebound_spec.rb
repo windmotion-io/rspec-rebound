@@ -151,8 +151,9 @@ describe RSpec::Rebound do
           end
         end
 
+        let(:example) { example_group.examples.first }
+
         it 'matches attempts metadata after retries' do
-          example = example_group.examples.first
           expect(example.metadata[:retry_attempts]).to eq(2)
         end
 
