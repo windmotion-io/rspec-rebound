@@ -9,6 +9,23 @@ on:
       - master
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+          ruby-version: 3.3
+
+      - name: Run rubocop
+        run: |
+          bundle exec rubocop Gemfile rspec-rebound.gemspec lib spec Rakefile
+
   test:
     runs-on: ubuntu-latest
 

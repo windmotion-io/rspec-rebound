@@ -6,50 +6,49 @@ module RSpec
   class Rebound
     def self.setup
       RSpec.configure do |config|
-        config.add_setting :verbose_retry, :default => false
-        config.add_setting :default_retry_count, :default => 0
-        config.add_setting :default_sleep_interval, :default => 0
-        config.add_setting :exponential_backoff, :default => false
-        config.add_setting :clear_lets_on_failure, :default => true
-        config.add_setting :display_try_failure_messages, :default => false
+        config.add_setting :verbose_retry, default: false
+        config.add_setting :default_retry_count, default: 0
+        config.add_setting :default_sleep_interval, default: 0
+        config.add_setting :exponential_backoff, default: false
+        config.add_setting :clear_lets_on_failure, default: true
+        config.add_setting :display_try_failure_messages, default: false
 
         # retry based on example metadata
-        config.add_setting :retry_count_condition, :default => ->(_) { nil }
+        config.add_setting :retry_count_condition, default: ->(_) { nil }
 
         # If a list of exceptions is provided and 'retry' > 1, we only retry if
         # the exception that was raised by the example is NOT in that list. Otherwise
         # we ignore the 'retry' value and fail immediately.
         #
         # If no list of exceptions is provided and 'retry' > 1, we always retry.
-        config.add_setting :exceptions_to_hard_fail, :default => []
+        config.add_setting :exceptions_to_hard_fail, default: []
 
         # If a list of exceptions is provided and 'retry' > 1, we only retry if
         # the exception that was raised by the example is in that list. Otherwise
         # we ignore the 'retry' value and fail immediately.
         #
         # If no list of exceptions is provided and 'retry' > 1, we always retry.
-        config.add_setting :exceptions_to_retry, :default => []
+        config.add_setting :exceptions_to_retry, default: []
 
         # Callback between retries
-        config.add_setting :retry_callback, :default => nil
+        config.add_setting :retry_callback, default: nil
 
         # Callback for flaky tests
-        config.add_setting :flaky_test_callback, :default => nil
+        config.add_setting :flaky_test_callback, default: nil
 
-        # If true, flaky tests will be detected and reported, even if the retry count is set to 0. This is useful for detecting flaky tests that are not being retried.
-        config.add_setting :flaky_spec_detection, :default => false
+        # If true, flaky tests will be detected and reported, even if the retry count is set to 0.
+        # This is useful for detecting flaky tests that are not being retried.
+        config.add_setting :flaky_spec_detection, default: false
 
-        config.around(:each) do |ex|
-          ex.run_with_retry
-        end
+        config.around(:each, &:run_with_retry)
       end
     end
 
-    attr_reader :context, :ex
+    attr_reader :context, :initial_example
 
-    def initialize(ex, opts = {})
-      @ex = ex
-      @ex.metadata.merge!(opts)
+    def initialize(initial_example, opts = {})
+      @initial_example = initial_example
+      @initial_example.metadata.merge!(opts)
       current_example.attempts ||= 0
     end
 
@@ -59,13 +58,13 @@ module RSpec
 
     def retry_count
       [
-          (
-          ENV['RSPEC_REBOUND_RETRY_COUNT'] ||
-              ex.metadata[:retry] ||
-              RSpec.configuration.retry_count_condition.call(ex) ||
-              RSpec.configuration.default_retry_count
-          ).to_i,
-          0
+        (
+        ENV['RSPEC_REBOUND_RETRY_COUNT'] ||
+            initial_example.metadata[:retry] ||
+            RSpec.configuration.retry_count_condition.call(initial_example) ||
+            RSpec.configuration.default_retry_count
+      ).to_i,
+        0
       ].max
     end
 
@@ -78,28 +77,30 @@ module RSpec
     end
 
     def clear_lets
-      !ex.metadata[:clear_lets_on_failure].nil? ?
-          ex.metadata[:clear_lets_on_failure] :
-          RSpec.configuration.clear_lets_on_failure
+      if !initial_example.metadata[:clear_lets_on_failure].nil?
+        initial_example.metadata[:clear_lets_on_failure]
+      else
+        RSpec.configuration.clear_lets_on_failure
+      end
     end
 
     def sleep_interval
-      if ex.metadata[:exponential_backoff]
-          2**(current_example.attempts-1) * ex.metadata[:retry_wait]
+      if initial_example.metadata[:exponential_backoff]
+        2**(current_example.attempts - 1) * initial_example.metadata[:retry_wait]
       else
-          ex.metadata[:retry_wait] ||
-              RSpec.configuration.default_sleep_interval
+        initial_example.metadata[:retry_wait] ||
+          RSpec.configuration.default_sleep_interval
       end
     end
 
     def exceptions_to_hard_fail
-      ex.metadata[:exceptions_to_hard_fail] ||
-          RSpec.configuration.exceptions_to_hard_fail
+      initial_example.metadata[:exceptions_to_hard_fail] ||
+        RSpec.configuration.exceptions_to_hard_fail
     end
 
     def exceptions_to_retry
-      ex.metadata[:exceptions_to_retry] ||
-          RSpec.configuration.exceptions_to_retry
+      initial_example.metadata[:exceptions_to_retry] ||
+        RSpec.configuration.exceptions_to_retry
     end
 
     def verbose_retry?
@@ -111,73 +112,61 @@ module RSpec
     end
 
     def run
-      example = current_example
+      new_example = current_example
       loop do
-        if attempts > 0
-          RSpec.configuration.formatters.each { |f| f.retry(example) if f.respond_to? :retry }
+        if attempts.positive?
+          RSpec.configuration.formatters.each { |f| f.retry(new_example) if f.respond_to? :retry }
           if verbose_retry?
-            message = "RSpec::Rebound: #{ordinalize(attempts + 1)} try #{example.location}"
-            message = "\n" + message if attempts == 1
+            message = "RSpec::Rebound: #{ordinalize(attempts + 1)} try #{new_example.location}"
+            message = "\n#{message}" if attempts == 1
             RSpec.configuration.reporter.message(message)
           end
         end
 
-        example.metadata[:retry_attempts] = self.attempts
-        example.metadata[:retry_exceptions] ||= []
+        new_example.metadata[:retry_attempts] = attempts
+        new_example.metadata[:retry_exceptions] ||= []
 
-        example.clear_exception
-        ex.run
+        new_example.clear_exception
+        initial_example.run
 
-        if example.exception.nil?
-          # If it's a flaky test, call the callback
-          if attempts > 0
-            if RSpec.configuration.flaky_test_callback
-              example.example_group_instance.instance_exec(example, &RSpec.configuration.flaky_test_callback)
-            end
+        # If it's a flaky test, call the callback
+        if new_example.exception.nil? && attempts.positive?
+          if RSpec.configuration.flaky_test_callback
+            new_example.example_group_instance.instance_exec(new_example, &RSpec.configuration.flaky_test_callback)
+          end
 
-            if flaky_spec_detection?(attempts)
-              if display_try_failure_messages?
-                display_try_failure_message(example, attempts, retry_count)
-              end
-              example.exception = example.metadata[:retry_exceptions].last
-            end
+          if flaky_spec_detection?(attempts)
+            display_try_failure_message(new_example, attempts, retry_count) if display_try_failure_messages?
+            new_example.exception = new_example.metadata[:retry_exceptions].last
           end
         end
 
         self.attempts += 1
 
-        break if example.exception.nil?
+        break if new_example.exception.nil?
 
-        example.metadata[:retry_exceptions] << example.exception
+        new_example.metadata[:retry_exceptions] << new_example.exception
 
         break if !flaky_spec_detection?(attempts) && attempts >= retry_count + 1
 
-        if exceptions_to_hard_fail.any?
-          break if exception_exists_in?(exceptions_to_hard_fail, example.exception)
-        end
+        break if exceptions_to_hard_fail.any? && exception_exists_in?(exceptions_to_hard_fail, new_example.exception)
 
-        if exceptions_to_retry.any?
-          break unless exception_exists_in?(exceptions_to_retry, example.exception)
-        end
+        break if exceptions_to_retry.any? && !exception_exists_in?(exceptions_to_retry, new_example.exception)
 
-        if verbose_retry? && display_try_failure_messages?
-          display_try_failure_message(example, attempts, retry_count)
-        end
+        display_try_failure_message(new_example, attempts, retry_count) if verbose_retry? && display_try_failure_messages?
 
-        example.example_group_instance.clear_lets if clear_lets
+        new_example.example_group_instance.clear_lets if clear_lets
 
         # If the callback is defined, let's call it
         if RSpec.configuration.retry_callback
-          example.example_group_instance.instance_exec(example, &RSpec.configuration.retry_callback)
+          new_example.example_group_instance.instance_exec(new_example, &RSpec.configuration.retry_callback)
         end
 
-        if RSpec.configuration.flaky_spec_detection
-          if attempts > 0 && example.exception.nil?
-            example.example_group_instance.instance_exec(example, &RSpec.configuration.flaky_spec_detection)
-          end
+        if RSpec.configuration.flaky_spec_detection && attempts.positive? && new_example.exception.nil?
+          new_example.example_group_instance.instance_exec(new_example, &RSpec.configuration.flaky_spec_detection)
         end
 
-        sleep sleep_interval if sleep_interval.to_f > 0
+        sleep sleep_interval if sleep_interval.to_f.positive?
       end
     end
 
@@ -189,10 +178,10 @@ module RSpec
         "#{number}th"
       else
         case number.to_i % 10
-        when 1; "#{number}st"
-        when 2; "#{number}nd"
-        when 3; "#{number}rd"
-        else    "#{number}th"
+        when 1 then "#{number}st"
+        when 2 then "#{number}nd"
+        when 3 then "#{number}rd"
+        else "#{number}th"
         end
       end
     end
@@ -209,9 +198,9 @@ module RSpec
 
     def display_try_failure_message(example, attempts, retry_count)
       return if attempts == retry_count + 1
-      
+
       exception_strings =
-        if ::RSpec::Core::MultipleExceptionError::InterfaceTag === example.exception
+        if example.exception.is_a?(::RSpec::Core::MultipleExceptionError::InterfaceTag)
           example.exception.all_exceptions.map(&:to_s)
         else
           [example.exception.to_s]
