@@ -2,16 +2,14 @@ require 'rspec'
 require 'rspec/core/sandbox'
 
 require 'rspec/rebound'
-if Gem::Version.new(RUBY_VERSION) > Gem::Version.new('3')
-  require 'debug'
-end
+require 'debug' if Gem::Version.new(RUBY_VERSION) > Gem::Version.new('3')
 
 RSpec.configure do |config|
   config.verbose_retry = true
   config.display_try_failure_messages = true
 
-  config.around :example do |ex|
-    RSpec::Core::Sandbox.sandboxed do |config|
+  config.around do |ex|
+    RSpec::Core::Sandbox.sandboxed do |_config|
       RSpec::Rebound.setup
       ex.run
     end
