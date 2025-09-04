@@ -103,7 +103,7 @@ describe RSpec::Rebound do
       it 'waits between retries', :exponential_backoff, retry: 3, retry_wait: 0.001 do
         expect(shift_expectation).to be true
         expect(count).to eq(3)
-        expect(Time.now - @start_time).to be >= 0.001
+        expect(Time.now - @start_time).to be >= 0.008
       end
     end
 
