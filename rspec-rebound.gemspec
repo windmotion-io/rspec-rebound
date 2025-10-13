@@ -22,5 +22,5 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency 'debug', '~> 1.0'
   gem.add_development_dependency 'rake', '~> 13.0'
   gem.add_development_dependency 'rspec', '~> 3.3'
-  gem.add_development_dependency 'rubocop', '>= 1.72.1', '< 2.0'
+  gem.add_development_dependency 'standard', '>= 1.35.1'
 end
