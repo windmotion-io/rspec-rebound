@@ -1,8 +1,8 @@
-require 'rspec'
-require 'rspec/core/sandbox'
+require "rspec"
+require "rspec/core/sandbox"
 
-require 'rspec/rebound'
-require 'debug' if Gem::Version.new(RUBY_VERSION) > Gem::Version.new('3')
+require "rspec/rebound"
+require "debug" if Gem::Version.new(RUBY_VERSION) > Gem::Version.new("3")
 
 RSpec.configure do |config|
   config.verbose_retry = true

@@ -22,10 +22,9 @@ jobs:
           bundler-cache: true
           ruby-version: 3.3
 
-      - name: Run rubocop
+      - name: Run standardrb
         run: |
-          bundle exec rubocop Gemfile rspec-rebound.gemspec lib spec Rakefile
-
+          bundle exec standardrb --format=github
   test:
     runs-on: ubuntu-latest
 
