@@ -174,7 +174,7 @@ module RSpec
 
     # borrowed from ActiveSupport::Inflector
     def ordinalize(number)
-      if (11..13).include?(number.to_i % 100)
+      if (11..13).cover?(number.to_i % 100)
         "#{number}th"
       else
         case number.to_i % 10
