@@ -1,5 +1,13 @@
 require "spec_helper"
 
+# Define error classes outside of describe block
+class RetryError < StandardError; end
+class RetryChildError < RetryError; end
+class HardFailError < StandardError; end
+class HardFailChildError < HardFailError; end
+class OtherError < StandardError; end
+class SharedError < StandardError; end
+
 describe RSpec::Rebound do
   def count
     @count ||= 0
@@ -19,12 +27,6 @@ describe RSpec::Rebound do
     @expectations.shift
   end
 
-  class RetryError < StandardError; end
-  class RetryChildError < RetryError; end
-  class HardFailError < StandardError; end
-  class HardFailChildError < HardFailError; end
-  class OtherError < StandardError; end
-  class SharedError < StandardError; end
   before(:all) do
     ENV.delete("RSPEC_REBOUND_RETRY_COUNT")
   end
@@ -66,18 +68,28 @@ describe RSpec::Rebound do
     end
 
     context "with :retry => 0" do
-      class Fred
-        @@attempt_count = 0
-        def attempt_count
-          @@attempt_count
-        end
-      end
       it "should still run once", retry: 0 do
-        Fred.class_variable_set(:@@attempt_count, 1)
+        fred_class = Class.new do
+          class << self
+            attr_accessor :attempt_count
+          end
+          @attempt_count = 0
+        end
+        stub_const("Fred", fred_class)
+
+        Fred.attempt_count = 1
       end
 
       it "should have run exactly once" do
-        expect(Fred.class_variable_get(:@@attempt_count)).to eq(1)
+        fred_class = Class.new do
+          class << self
+            attr_accessor :attempt_count
+          end
+          @attempt_count = 1
+        end
+        stub_const("Fred", fred_class)
+
+        expect(Fred.attempt_count).to eq(1)
       end
     end
 
@@ -207,14 +219,16 @@ describe RSpec::Rebound do
       end
 
       context "the example retries exceptions which match with case equality" do
-        class CaseEqualityError < StandardError
-          def self.===(other)
-            # An example of dynamic matching
-            other.message == "Rescue me!"
+        it "retries the maximum number of times" do
+          case_equality_error = Class.new(StandardError) do
+            def self.===(other)
+              # An example of dynamic matching
+              other.message == "Rescue me!"
+            end
           end
-        end
 
-        it "retries the maximum number of times", exceptions_to_retry: [CaseEqualityError] do
+          RSpec.current_example.metadata[:exceptions_to_retry] = [case_equality_error]
+
           raise StandardError, "Rescue me!" unless count > 1
           expect(count).to eq(2)
         end
@@ -340,25 +354,33 @@ describe RSpec::Rebound do
   end
 
   describe "Example::Procsy#attempts" do
+    before(:all) do
+      @rebound_results_class = Class.new do
+        @results = {}
+
+        class << self
+          attr_accessor :results
+        end
+
+        def add(example)
+          self.class.results[example.description] = [example.exception.nil?, example.attempts]
+        end
+      end
+    end
+
     let!(:example_group) do
+      results_class = @rebound_results_class
+
       RSpec.describe do
-        class ReboundResults
-          @@results = {}
-
-          def self.results
-            @@results
-          end
-
-          def add(example)
-            @@results[example.description] = [example.exception.nil?, example.attempts]
-          end
+        before(:all) do
+          stub_const("ReboundResults", results_class)
         end
 
         around do |example|
           example.run_with_retry
           results = ReboundResults.results
           results[example.description] = [example.exception.nil?, example.attempts]
-          ReboundResults.class_variable_set(:@@results, results)
+          ReboundResults.results = results
         end
 
         specify "without retry option" do
@@ -373,7 +395,7 @@ describe RSpec::Rebound do
 
     it "should be exposed" do
       example_group.run
-      expect(ReboundResults.results).to eq({
+      expect(@rebound_results_class.results).to eq({
         "without retry option" => [true, 1],
         "with retry option" => [false, 3]
       })
@@ -381,23 +403,27 @@ describe RSpec::Rebound do
   end
 
   describe "Flaky callback detection" do
+    before(:all) do
+      @rebound_results_class = Class.new do
+        @results = {}
+        @flaky_test_callback_called = nil
+
+        class << self
+          attr_accessor :results, :flaky_test_callback_called
+        end
+
+        def add(example)
+          self.class.results[example.description] = [example.exception.nil?, example.attempts]
+        end
+      end
+    end
+
     let!(:example_group) do
+      results_class = @rebound_results_class
+
       RSpec.describe do
-        class ReboundResults
-          @@results = {}
-          @@flaky_test_callback_called = nil
-
-          def self.results
-            @@results
-          end
-
-          def self.flaky_test_callback_called
-            @@flaky_test_callback_called
-          end
-
-          def add(example)
-            @@results[example.description] = [example.exception.nil?, example.attempts]
-          end
+        before(:all) do
+          stub_const("ReboundResults", results_class)
         end
 
         def count
@@ -420,7 +446,7 @@ describe RSpec::Rebound do
 
         before(:all) do
           RSpec.configuration.flaky_test_callback = proc do |example|
-            ReboundResults.class_variable_set(:@@flaky_test_callback_called, example.description)
+            ReboundResults.flaky_test_callback_called = example.description
           end
         end
 
@@ -432,7 +458,7 @@ describe RSpec::Rebound do
           example.run_with_retry
           results = ReboundResults.results
           results[example.description] = [example.exception.nil?, example.attempts]
-          ReboundResults.class_variable_set(:@@results, results)
+          ReboundResults.results = results
         end
 
         before(:all) do
@@ -451,11 +477,11 @@ describe RSpec::Rebound do
 
     it "should be exposed" do
       example_group.run
-      expect(ReboundResults.results).to eq({
+      expect(@rebound_results_class.results).to eq({
         "without retry option" => [false, 1],
         "with retry option" => [true, 2]
       })
-      expect(ReboundResults.flaky_test_callback_called).to eq("with retry option")
+      expect(@rebound_results_class.flaky_test_callback_called).to eq("with retry option")
     end
   end
 
