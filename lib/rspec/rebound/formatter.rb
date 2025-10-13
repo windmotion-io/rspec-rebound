@@ -1,4 +1,4 @@
-require 'rspec/core/formatters/base_text_formatter'
+require "rspec/core/formatters/base_text_formatter"
 
 module RSpec
   module Rebound
@@ -6,19 +6,24 @@ module RSpec
       RSpec::Core::Formatters.register self, :example_passed
 
       def initialize(output)
-        super(output)
-        @tries = Hash.new { |h, k| h[k] = { successes: 0, tries: 0 } }
+        super
+        @tries = Hash.new { |h, k| h[k] = {successes: 0, tries: 0} }
       end
 
-      def seed(_); end
+      def seed(_)
+      end
 
-      def message(_message); end
+      def message(_message)
+      end
 
-      def close(_); end
+      def close(_)
+      end
 
-      def dump_failures(_); end
+      def dump_failures(_)
+      end
 
-      def dump_pending(_); end
+      def dump_pending(_)
+      end
 
       def dump_summary(notification)
         summary = "\nRSpec Rebound Summary:\n"
