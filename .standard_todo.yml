@@ -6,4 +6,3 @@ ignore:
   - Performance/RangeInclude
 - spec/lib/rspec/rebound_spec.rb:
   - Lint/ConstantDefinitionInBlock
-  - Style/GlobalVars

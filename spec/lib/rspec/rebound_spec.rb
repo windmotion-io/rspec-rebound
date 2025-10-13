@@ -143,15 +143,17 @@ describe RSpec::Rebound do
 
         let(:example_code) do
           %(
-            $count ||= 0
-            $count += 1
+            Thread.current[:count] ||= 0
+            Thread.current[:count] += 1
 
-            raise NameError unless $count > 2
+            raise NameError unless Thread.current[:count] > 2
           )
         end
 
         let!(:example_group) do
-          $count, $example_code = 0, example_code
+          example_code_value = example_code
+          Thread.current[:count] = 0
+          Thread.current[:example_code] = example_code_value
 
           RSpec.describe("example group", exceptions_to_retry: [NameError], retry: 3).tap do |this|
             this.run # initialize for rspec 3.3+ with no examples
@@ -163,7 +165,7 @@ describe RSpec::Rebound do
         end
 
         it "should retry and match attempts metadata" do
-          example_group.example { instance_eval($example_code) }
+          example_group.example { instance_eval(Thread.current[:example_code]) }
           example_group.run
 
           expect(retry_attempts).to eq(2)
@@ -174,7 +176,7 @@ describe RSpec::Rebound do
         end
 
         it "should add exceptions into retry_exceptions metadata array" do
-          example_group.example { instance_eval($example_code) }
+          example_group.example { instance_eval(Thread.current[:example_code]) }
           example_group.run
 
           expect(retry_exceptions.count).to eq(2)
