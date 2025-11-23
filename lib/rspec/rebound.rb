@@ -77,11 +77,7 @@ module RSpec
     end
 
     def clear_lets
-      if !initial_example.metadata[:clear_lets_on_failure].nil?
-        initial_example.metadata[:clear_lets_on_failure]
-      else
-        RSpec.configuration.clear_lets_on_failure
-      end
+      initial_example.metadata.fetch(:clear_lets_on_failure, RSpec.configuration.clear_lets_on_failure)
     end
 
     def sleep_interval
