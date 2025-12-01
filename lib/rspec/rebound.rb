@@ -1,6 +1,6 @@
-require 'rspec/core'
-require 'rspec/rebound/version'
-require 'rspec_ext/rspec_ext'
+require "rspec/core"
+require "rspec/rebound/version"
+require "rspec_ext/rspec_ext"
 
 module RSpec
   class Rebound
@@ -14,7 +14,7 @@ module RSpec
         config.add_setting :display_try_failure_messages, default: false
 
         # retry based on example metadata
-        config.add_setting :retry_count_condition, default: ->(_) { nil }
+        config.add_setting :retry_count_condition, default: ->(_) {}
 
         # If a list of exceptions is provided and 'retry' > 1, we only retry if
         # the exception that was raised by the example is NOT in that list. Otherwise
@@ -59,7 +59,7 @@ module RSpec
     def retry_count
       [
         (
-        ENV['RSPEC_REBOUND_RETRY_COUNT'] ||
+        ENV["RSPEC_REBOUND_RETRY_COUNT"] ||
             initial_example.metadata[:retry] ||
             RSpec.configuration.retry_count_condition.call(initial_example) ||
             RSpec.configuration.default_retry_count
@@ -170,7 +170,7 @@ module RSpec
 
     # borrowed from ActiveSupport::Inflector
     def ordinalize(number)
-      if (11..13).include?(number.to_i % 100)
+      if (11..13).cover?(number.to_i % 100)
         "#{number}th"
       else
         case number.to_i % 10
